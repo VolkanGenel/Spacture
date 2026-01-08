@@ -10,7 +10,7 @@ Professional video clipping and editing web application built with Angular 17 an
 ### Installation
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/spacture.git
+git clone https://github.com/VolkanGenel/Spacture.git
 cd spacture
 
 # Start application
