@@ -1,92 +1,223 @@
 <div class="card shadow">
-  <div class="card-header bg-info text-white">
+  <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
     <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Video Player</h5>
+    
+    <!-- Player Seçici -->
+    <div class="player-selector">
+      <div class="btn-group btn-group-sm" role="group">
+        <button type="button" 
+                class="btn btn-outline-light" 
+                [class.active]="selectedPlayer === 'native'"
+                (click)="selectPlayer('native')"
+                [disabled]="!currentVideo">
+          <i class="bi bi-display me-1"></i> Native
+        </button>
+        <button type="button" 
+                class="btn btn-outline-light" 
+                [class.active]="selectedPlayer === 'plyr'"
+                (click)="selectPlayer('plyr')"
+                [disabled]="!currentVideo">
+          <i class="bi bi-play-btn me-1"></i> Plyr
+        </button>
+      </div>
+    </div>
   </div>
+  
   <div class="card-body text-center">
     <div *ngIf="!currentVideo" class="alert alert-info">
       <i class="bi bi-info-circle me-2"></i>Please upload a video first to see the player
     </div>
 
-    <div *ngIf="currentVideo" class="video-container mb-3">
-      <!-- Event listener'ları ekleyin -->
-      <video #videoPlayer 
-             controls 
-             width="100%" 
-             class="rounded"
-             (click)="onVideoClick()"
-             (play)="onVideoPlay()">
-        <source [src]="videoSrc" type="video/mp4">
-        <!-- <source [src]="'http://localhost:8000/uploads/' + currentVideo.filename" type="video/mp4"> -->
-        Your browser does not support the video tag.
-      </video>
-      
-      <!-- Kullanıcı etkileşimi uyarısı -->
-      <div *ngIf="!userInteracted" class="alert alert-warning mt-2">
-        <small>
-          <i class="bi bi-exclamation-triangle me-1"></i>
-          <strong>Chrome requires:</strong> Click the video player once to enable quick navigation
-        </small>
+    <div *ngIf="currentVideo" class="video-player-wrapper">
+      <!-- CHROME OPTIMIZED NATIVE PLAYER -->
+      <div *ngIf="selectedPlayer === 'native'" class="native-player-container">
+        <div class="video-embed-container">
+          <video #videoPlayer 
+                 controls 
+                 controlsList="nodownload"
+                 width="100%" 
+                 class="video-element"
+                 (click)="onVideoClick()"
+                 (play)="onVideoPlay()"
+                 crossorigin="anonymous"
+                 playsinline
+                 preload="auto">
+            <source [src]="videoSrc" type="video/mp4">
+            Your browser does not support HTML5 video.
+          </video>
+        </div>
+        
+        <!-- Loading indicator -->
+        <div *ngIf="!isPlayerReady && selectedPlayer === 'native'" class="player-loading-overlay">
+          <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
       </div>
+
+      <!-- PLYR PLAYER - DÜZELTİLDİ -->
+      <div *ngIf="selectedPlayer === 'plyr'" class="plyr-player-container">
+        <!-- Plyr container - DOĞRU YAPI -->
+        <div #plyrPlayer class="plyr__video-embed plyr-container" id="plyr-player">
+          <!-- Plyr video element'ini buraya inject edecek -->
+        </div>
+        
+        <div *ngIf="!plyrInitialized && selectedPlayer === 'plyr'" class="player-loading-overlay">
+          <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Loading Plyr...</span>
+          </div>
+          <div class="mt-2 text-light">Initializing Plyr player...</div>
+        </div>
+      </div>
+      
     </div>
 
-    <div *ngIf="currentVideo" class="mt-3">
-      <h6>Quick Navigation</h6>
-      <div class="btn-group flex-wrap" role="group">
-        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(0)">
-          00:00
-        </button>
-        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(30)">
-          00:30
-        </button>
-        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(60)">
-          01:00
-        </button>
-        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(120)">
-          02:00
-        </button>
-        <button class="btn btn-outline-primary btn-sm m-1" (click)="goToMiddle()">
-          Middle
-        </button>
+    <!-- Controls - SIMPLIFIED -->
+    <div *ngIf="currentVideo" class="controls-container mt-3">
+      <!-- Simple Time Navigation -->
+      <div class="simple-navigation mb-3">
+
+        <!-- <div class="d-flex justify-content-between align-items-center mb-2">
+          <small class="text-muted">
+            <i class="bi bi-play-btn me-1"></i>
+            <strong>{{selectedPlayer === 'native' ? 'Native' : 'Plyr'}}</strong>
+            <span class="mx-2">•</span>
+            <i class="bi bi-clock me-1"></i>
+            {{currentTime | number:'1.0-0'}}s / {{currentVideo?.duration || 0 | number:'1.0-0'}}s
+          </small>
+          
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" 
+                    (click)="selectPlayer('native')"
+                    [class.active]="selectedPlayer === 'native'"
+                    title="Switch to Native Player">
+              <i class="bi bi-display"></i>
+            </button>
+            <button class="btn btn-outline-secondary" 
+                    (click)="selectPlayer('plyr')"
+                    [class.active]="selectedPlayer === 'plyr'"
+                    title="Switch to Plyr Player">
+              <i class="bi bi-play-btn"></i>
+            </button>
+          </div>
+        </div> -->
+
+        <!-- Quick Actions -->
+        <div class="quick-actions mb-3">
+          <div class="btn-group w-100" role="group">
+            <button class="btn btn-outline-primary btn-sm" 
+                    (click)="skipBackward(15)"
+                    [disabled]="!isPlayerReady"
+                    title="15 seconds back">
+              <i class="bi bi-rewind"></i> 15s
+            </button>
+            <button class="btn btn-outline-primary btn-sm" 
+                    (click)="skipBackward(5)"
+                    [disabled]="!isPlayerReady"
+                    title="5 seconds back">
+              <i class="bi bi-skip-backward"></i> 5s
+            </button>
+            <button class="btn btn-primary btn-sm" 
+                    (click)="togglePlay()"
+                    [disabled]="!isPlayerReady"
+                    title="Play/Pause">
+              <i class="bi bi-play-fill" *ngIf="isPaused"></i>
+              <i class="bi bi-pause-fill" *ngIf="!isPaused"></i>
+            </button>
+            <button class="btn btn-outline-primary btn-sm" 
+                    (click)="skipForward(5)"
+                    [disabled]="!isPlayerReady"
+                    title="5 seconds forward">
+              5s <i class="bi bi-skip-forward"></i>
+            </button>
+            <button class="btn btn-outline-primary btn-sm" 
+                    (click)="skipForward(15)"
+                    [disabled]="!isPlayerReady"
+                    title="15 seconds forward">
+              15s <i class="bi bi-fast-forward"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Time Jumps -->
+        <div class="quick-jumps">
+          <small class="text-muted d-block mb-2">Jump to:</small>
+          <div class="btn-group w-100" role="group">
+            <button class="btn btn-outline-secondary btn-sm" 
+                    (click)="setCurrentTime(0)"
+                    [disabled]="!isPlayerReady">
+              0:00
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" 
+                    (click)="setCurrentTime(30)"
+                    [disabled]="!isPlayerReady">
+              0:30
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" 
+                    (click)="setCurrentTime(60)"
+                    [disabled]="!isPlayerReady">
+              1:00
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" 
+                    (click)="setCurrentTime(120)"
+                    [disabled]="!isPlayerReady">
+              2:00
+            </button>
+            <button class="btn btn-outline-primary btn-sm" 
+                    (click)="goToMiddle()"
+                    [disabled]="!isPlayerReady">
+              <i class="bi bi-symmetry-vertical"></i> Mid
+            </button>
+          </div>
+        </div>
       </div>
-      
-      <!-- Durum göstergesi -->
-      <div class="mt-2">
-        <small class="text-muted">
-          Status: 
-          <span *ngIf="userInteracted" class="text-success">
-            <i class="bi bi-check-circle"></i> Ready
-          </span>
-          <span *ngIf="!userInteracted" class="text-warning">
-            <i class="bi bi-exclamation-circle"></i> Click video to enable
-          </span>
+
+      <!-- User Interaction Prompt -->
+      <div *ngIf="!userInteracted && isPlayerReady" class="alert alert-info alert-sm py-1 mb-0">
+        <small>
+          <i class="bi bi-info-circle me-1"></i>
+          Click the video to enable playback controls
         </small>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Debug panel (isteğe bağlı)
+<!-- Debug Console (YORUM İÇİNDE - İHTİYAÇ HALİNDE AÇILABİLİR) -->
+<!--
 <div class="card shadow mt-3">
-  <div class="card-header bg-secondary text-white">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
     <h6 class="mb-0">
-      <i class="bi bi-bug me-2"></i>Debug Console
-      <button class="btn btn-sm btn-outline-light float-end" (click)="clearDebugMessages()">
-        Clear
-      </button>
+      <i class="bi bi-terminal me-2"></i>Debug Console
+      <span class="badge bg-secondary ms-2">{{debugMessages.length}}</span>
     </h6>
-  </div>
-  <div class="card-body p-2" style="max-height: 200px; overflow-y: auto; font-size: 0.8rem;">
-    <div *ngFor="let msg of debugMessages" class="debug-message mb-1">
-      <code>{{msg}}</code>
+    <div>
+      <button class="btn btn-sm btn-outline-light me-2" (click)="selectPlayer('native')">
+        <i class="bi bi-display"></i> Force Native
+      </button>
+      <button class="btn btn-sm btn-outline-light" (click)="clearDebugMessages()">
+        <i class="bi bi-trash"></i> Clear
+      </button>
     </div>
-    <div *ngIf="debugMessages.length === 0" class="text-muted">
-      No debug messages yet...
+  </div>
+  <div class="card-body p-0">
+    <div class="console-output" style="max-height: 250px; overflow-y: auto; font-family: 'Consolas', monospace;">
+      <div *ngFor="let msg of debugMessages" 
+           class="console-line px-3 py-1 border-bottom"
+           [ngClass]="{
+             'text-danger': msg.includes('ERROR') || msg.includes('error'),
+             'text-success': msg.includes('READY') || msg.includes('✅'),
+             'text-warning': msg.includes('WARN') || msg.includes('⚠️')
+           }">
+        <small>{{msg}}</small>
+      </div>
+      <div *ngIf="debugMessages.length === 0" class="text-muted px-3 py-3 text-center">
+        No debug messages yet...
+      </div>
     </div>
   </div>
-</div> -->
-
-
-
+</div>
+-->
 
 <!-- <div class="card shadow">
   <div class="card-header bg-info text-white">

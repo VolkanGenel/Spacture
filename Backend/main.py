@@ -1,18 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-
 import os
 import shutil
 import uuid
 from datetime import datetime
 import ffmpeg
 import json
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 import sqlite3
 import subprocess
+from pathlib import Path
 
 # FastAPI uygulamasını bir kere oluştur (max upload size ile birlikte)
 app = FastAPI(
@@ -20,24 +20,16 @@ app = FastAPI(
     max_upload_size=100 * 1024 * 1024  # 100MB
 )
 
-# CORS ayarları
+# CORS ayarları - CHROME İÇİN GÜNCELLENDİ
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for Docker
+    allow_origins=["http://localhost", "http://localhost:4200", "http://localhost:3000", "http://localhost:8080"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["Content-Range", "Accept-Ranges", "Content-Length", "Content-Type"],
+    max_age=3600
 )
-
-# Özel CORS middleware (ek güvenlik için)
-@app.middleware("http")
-async def add_cors_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
 
 # ÖNCE KLASÖRLERİ OLUŞTUR
 UPLOAD_FOLDER = "uploads"
@@ -45,23 +37,219 @@ CLIPS_FOLDER = "clips"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(CLIPS_FOLDER, exist_ok=True)
 
-# SONRA STATIC DOSYALARI MOUNT ET
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/clips", StaticFiles(directory="clips"), name="clips")
 
+# VIDEO STREAMING İÇİN ÖZEL ROUTE
+@app.get("/uploads/{filename}")
+async def stream_video(filename: str, request: Request):
+    """Video streaming endpoint with range request support for Chrome"""
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Get file size
+    file_size = os.path.getsize(file_path)
+
+    # Check if it's a range request
+    range_header = request.headers.get("range")
+
+    if range_header:
+        # Parse range header
+        try:
+            byte1, byte2 = 0, None
+            range_ = range_header.replace("bytes=", "").split("-")
+            byte1 = int(range_[0])
+            if len(range_) == 2 and range_[1]:
+                byte2 = int(range_[1])
+
+            if byte2 is None:
+                byte2 = file_size - 1
+
+            # Ensure byte1 <= byte2
+            if byte1 > byte2:
+                byte1, byte2 = byte2, byte1
+
+            # Ensure byte2 is within file size
+            if byte2 >= file_size:
+                byte2 = file_size - 1
+
+            length = byte2 - byte1 + 1
+
+            # Read file chunk
+            def iterfile():
+                with open(file_path, "rb") as f:
+                    f.seek(byte1)
+                    remaining = length
+                    while remaining > 0:
+                        chunk_size = min(4096, remaining)
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+
+            # Return partial content response
+            headers = {
+                "Content-Range": f"bytes {byte1}-{byte2}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(length),
+                "Content-Type": "video/mp4",
+                "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD",
+                "Access-Control-Allow-Headers": "Range",
+                "Cache-Control": "no-cache"
+            }
+
+            return StreamingResponse(
+                iterfile(),
+                status_code=206,
+                headers=headers,
+                media_type="video/mp4"
+            )
+
+        except Exception as e:
+            print(f"Range request error: {e}")
+            # Fall back to full file response
+            pass
+
+    # Full file response (non-range request)
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+        "Content-Type": "video/mp4",
+        "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-cache, max-age=0"
+    }
+
+    def iterfile():
+        with open(file_path, "rb") as f:
+            while chunk := f.read(4096):
+                yield chunk
+
+    return StreamingResponse(
+        iterfile(),
+        media_type="video/mp4",
+        headers=headers
+    )
+
+
+# Clips için de streaming endpoint
+@app.get("/clips/{filename}")
+async def stream_clip(filename: str, request: Request):
+    """Clip streaming endpoint with range request support"""
+    file_path = os.path.join(CLIPS_FOLDER, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    # Get file size
+    file_size = os.path.getsize(file_path)
+
+    # Check if it's a range request
+    range_header = request.headers.get("range")
+
+    if range_header:
+        try:
+            byte1, byte2 = 0, None
+            range_ = range_header.replace("bytes=", "").split("-")
+            byte1 = int(range_[0])
+            if len(range_) == 2 and range_[1]:
+                byte2 = int(range_[1])
+
+            if byte2 is None:
+                byte2 = file_size - 1
+
+            if byte1 > byte2:
+                byte1, byte2 = byte2, byte1
+
+            if byte2 >= file_size:
+                byte2 = file_size - 1
+
+            length = byte2 - byte1 + 1
+
+            def iterfile():
+                with open(file_path, "rb") as f:
+                    f.seek(byte1)
+                    remaining = length
+                    while remaining > 0:
+                        chunk_size = min(4096, remaining)
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+
+            headers = {
+                "Content-Range": f"bytes {byte1}-{byte2}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(length),
+                "Content-Type": "video/mp4",
+                "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-cache"
+            }
+
+            return StreamingResponse(
+                iterfile(),
+                status_code=206,
+                headers=headers,
+                media_type="video/mp4"
+            )
+
+        except Exception as e:
+            print(f"Range request error for clip: {e}")
+
+    # Full file response
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+        "Content-Type": "video/mp4",
+        "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-cache, max-age=0"
+    }
+
+    def iterfile():
+        with open(file_path, "rb") as f:
+            while chunk := f.read(4096):
+                yield chunk
+
+    return StreamingResponse(
+        iterfile(),
+        media_type="video/mp4",
+        headers=headers
+    )
+
+
+# Statik dosyalar için mount (artık stream_video endpoint'imiz var, bu opsiyonel)
+# app.mount("/uploads", StaticFiles(directory="uploads", html=True), name="uploads")
+# app.mount("/clips", StaticFiles(directory="clips", html=True), name="clips")
 
 # Database setup
 def init_db():
     conn = sqlite3.connect('video_clips.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS clips
-                 (id TEXT PRIMARY KEY,
-                  name TEXT,
-                  source_video TEXT,
-                  start_time REAL,
-                  end_time REAL,
-                  clip_filename TEXT,
-                  created_at TEXT)''')
+                 (
+                     id
+                     TEXT
+                     PRIMARY
+                     KEY,
+                     name
+                     TEXT,
+                     source_video
+                     TEXT,
+                     start_time
+                     REAL,
+                     end_time
+                     REAL,
+                     clip_filename
+                     TEXT,
+                     created_at
+                     TEXT
+                 )''')
     conn.commit()
     conn.close()
 
@@ -121,12 +309,15 @@ async def upload_video(file: UploadFile = File(...)):
     metadata = get_video_metadata(file_path)
     file_size = os.path.getsize(file_path)
 
+    # Video için ön izleme oluştur (opsiyonel)
+    # create_video_thumbnail(file_path, file_id)
+
     return {
         "id": file_id,
         "filename": filename,
         "original_name": file.filename,
         "file_size": file_size,
-        "file_path": file_path,
+        "file_path": f"/uploads/{filename}",  # Streaming endpoint'e işaret ediyor
         **metadata
     }
 
@@ -145,10 +336,8 @@ def get_video_metadata(file_path: str):
         width = int(video_stream.get('width', 0))
         height = int(video_stream.get('height', 0))
 
-        # FPS'i hesaplamak için birden fazla yöntem deneyelim
+        # FPS'i hesapla
         fps = 0
-
-        # 1. Yöntem: 'r' (avg_frame_rate veya r_frame_rate) alanından
         fps_str = video_stream.get('avg_frame_rate') or video_stream.get('r_frame_rate')
         if fps_str:
             try:
@@ -160,42 +349,16 @@ def get_video_metadata(file_path: str):
             except:
                 fps = 0
 
-        # 2. Yöntem: Eğer hala 0 ise, tags'tan bak
-        if fps == 0 and 'tags' in video_stream:
-            tags = video_stream['tags']
-            if 'BPS' in tags:
-                try:
-                    fps = float(tags['BPS'])
-                except:
-                    pass
-
-        # 3. Yöntem: codec_time_base'dan hesapla
-        if fps == 0 and 'codec_time_base' in video_stream:
-            try:
-                time_base = video_stream['codec_time_base']
-                if '/' in time_base:
-                    num, den = map(float, time_base.split('/'))
-                    fps = den / num if num != 0 else 0
-            except:
-                pass
-
-        # 4. Yöntem: time_base'dan hesapla
-        if fps == 0 and 'time_base' in video_stream:
-            try:
-                time_base = video_stream['time_base']
-                if '/' in time_base:
-                    num, den = map(float, time_base.split('/'))
-                    fps = den / num if num != 0 else 0
-            except:
-                pass
-
         # Frame sayısını hesapla
         frame_count = int(video_stream.get('nb_frames', 0))
         if frame_count == 0 and fps > 0 and duration > 0:
             frame_count = int(duration * fps)
 
-        # File size
-        file_size = os.path.getsize(file_path)
+        # Codec bilgisi
+        codec = video_stream.get('codec_name', 'unknown')
+
+        # Bitrate
+        bitrate = int(video_stream.get('bit_rate', 0))
 
         return {
             "duration": round(duration, 2),
@@ -204,14 +367,16 @@ def get_video_metadata(file_path: str):
             "fps": round(fps, 2) if fps > 0 else 0,
             "width": width,
             "height": height,
-            "file_size": file_size
+            "codec": codec,
+            "bitrate": bitrate,
+            "file_size": os.path.getsize(file_path)
         }
     except Exception as e:
         print(f"Error getting metadata: {e}")
         import traceback
         traceback.print_exc()
 
-        # Fallback: basit dosya bilgisi
+        # Fallback
         try:
             file_size = os.path.getsize(file_path)
             return {
@@ -221,6 +386,8 @@ def get_video_metadata(file_path: str):
                 "fps": 0,
                 "width": 0,
                 "height": 0,
+                "codec": "unknown",
+                "bitrate": 0,
                 "file_size": file_size
             }
         except:
@@ -231,9 +398,25 @@ def get_video_metadata(file_path: str):
                 "fps": 0,
                 "width": 0,
                 "height": 0,
+                "codec": "unknown",
+                "bitrate": 0,
                 "file_size": 0
             }
 
+
+@app.get("/api/download/{filename}")
+async def download_clip(filename: str):
+    """Download clip file"""
+    file_path = os.path.join(CLIPS_FOLDER, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="video/mp4"
+    )
 
 @app.post("/api/clip/{video_id}")
 async def create_clip(video_id: str, clip_request: ClipRequest):
@@ -264,14 +447,14 @@ async def create_clip(video_id: str, clip_request: ClipRequest):
         (
             ffmpeg
             .input(video_path, ss=start_time, t=duration)
-            .output(clip_path, c="copy", acodec="copy")
+            .output(clip_path, vcodec="libx264", acodec="aac", preset="fast", movflags="faststart")
             .run(quiet=True, overwrite_output=True)
         )
 
         return {
             "clip_id": clip_id,
             "clip_filename": clip_filename,
-            "clip_path": clip_path,
+            "clip_path": f"/clips/{clip_filename}",
             "message": "Clip created successfully",
             "duration": round(duration, 2)
         }
@@ -279,21 +462,50 @@ async def create_clip(video_id: str, clip_request: ClipRequest):
         raise HTTPException(500, f"Error creating clip: {str(e)}")
 
 
-@app.get("/api/download/{clip_filename}")
-async def download_clip(clip_filename: str):
-    clip_path = os.path.join(CLIPS_FOLDER, clip_filename)
+# Bonus: Video info endpoint
+@app.get("/api/video/{video_id}/info")
+async def get_video_info(video_id: str):
+    video_path = os.path.join(UPLOAD_FOLDER, f"{video_id}.mp4")
 
-    if not os.path.exists(clip_path):
-        raise HTTPException(404, "Clip not found")
+    if not os.path.exists(video_path):
+        raise HTTPException(404, "Video not found")
 
-    return FileResponse(
-        clip_path,
-        media_type="video/mp4",
-        filename=clip_filename
-    )
+    metadata = get_video_metadata(video_path)
+
+    return {
+        "id": video_id,
+        "filename": f"{video_id}.mp4",
+        **metadata
+    }
 
 
-# Bonus: Clip Management Endpoints
+# Bonus: Video preload endpoint (ilk 1MB)
+@app.get("/api/video/{video_id}/preload")
+async def preload_video(video_id: str):
+    video_path = os.path.join(UPLOAD_FOLDER, f"{video_id}.mp4")
+
+    if not os.path.exists(video_path):
+        raise HTTPException(404, "Video not found")
+
+    # İlk 1MB'ı oku
+    chunk_size = 1024 * 1024  # 1MB
+    try:
+        with open(video_path, "rb") as f:
+            chunk = f.read(chunk_size)
+
+        return Response(
+            content=chunk,
+            media_type="video/mp4",
+            headers={
+                "Content-Type": "video/mp4",
+                "Cache-Control": "no-cache"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Error reading video: {str(e)}")
+
+
+# Clip Management Endpoints
 @app.post("/api/clips/save")
 async def save_clip(request: ClipSaveRequest):
     conn = sqlite3.connect('video_clips.db')
@@ -341,7 +553,10 @@ async def delete_clip(clip_id: str):
     if row:
         clip_path = os.path.join(CLIPS_FOLDER, row[0])
         if os.path.exists(clip_path):
-            os.remove(clip_path)
+            try:
+                os.remove(clip_path)
+            except:
+                pass
 
     # Database'den sil
     c.execute("DELETE FROM clips WHERE id = ?", (clip_id,))
@@ -352,6 +567,34 @@ async def delete_clip(clip_id: str):
     return {"message": "Clip deleted successfully"}
 
 
+# OPTIONS endpoints for CORS preflight
+@app.options("/uploads/{filename}")
+async def options_upload_stream():
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
+
+
+@app.options("/clips/{filename}")
+async def options_clip_stream():
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
