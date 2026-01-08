@@ -1,0 +1,67 @@
+=== SPACTURE VIDEO EDITOR - QUICK START ===
+
+📋 PREREQUISITES:
+1. Install Docker Desktop: https://docker.com
+2. Extract/Clone project files
+
+🚀 3-STEP INSTALLATION:
+
+STEP 1: START APPLICATION
+   Windows: Double-click "run.bat"
+   Mac/Linux: Terminal -> ./run.sh
+
+STEP 2: WAIT 3-5 MINUTES
+   First time: Docker downloads ~1.5GB
+   Watch terminal for progress
+
+STEP 3: OPEN BROWSER
+   Go to: http://localhost
+   API Docs: http://localhost:8000/docs
+
+🎬 USING THE APPLICATION:
+
+1. UPLOAD VIDEO:
+   - Click "Upload Video"
+   - Select MP4 file (max 100MB)
+   - Wait for processing
+
+2. CREATE CLIP:
+   - Play video in preview
+   - Drag start/end markers
+   - Click "Create Clip"
+
+3. SAVE CLIP:
+   - Enter clip name
+   - Click "Save"
+
+4. MANAGE CLIPS:
+   - Go to "My Clips"
+   - Download or delete clips
+
+🛠️ COMMON COMMANDS:
+
+Start:      docker-compose up -d
+Stop:       docker-compose down
+Logs:       docker-compose logs -f
+Status:     docker-compose ps
+Restart:    docker-compose restart
+
+🔧 TROUBLESHOOTING:
+
+1. Port 80 busy:
+   - Close Skype/IIS/Apache
+   - Or edit docker-compose.yml ports
+
+2. Docker not running:
+   - Start Docker Desktop
+   - Check system tray icon
+
+3. Check logs:
+   docker-compose logs
+
+📞 SUPPORT:
+- Check INSTALLATION_GUIDE.md for details
+- View logs for errors
+- Ensure MP4 format, ≤100MB
+
+=== HAPPY VIDEO EDITING! ===

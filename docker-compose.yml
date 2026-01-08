@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Backend Service - FastAPI
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Backend/uploads:/app/uploads
+      - ./Backend/clips:/app/clips
+      - ./Backend/video_clips.db:/app/video_clips.db
+    environment:
+      - UPLOAD_FOLDER=/app/uploads
+      - CLIPS_FOLDER=/app/clips
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Frontend Service - Angular
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+# Network tanımı
+networks:
+  app-network:
+    driver: bridge

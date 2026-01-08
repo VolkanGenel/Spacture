@@ -1,0 +1,128 @@
+<div class="card shadow">
+  <div class="card-header bg-info text-white">
+    <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Video Player</h5>
+  </div>
+  <div class="card-body text-center">
+    <div *ngIf="!currentVideo" class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>Please upload a video first to see the player
+    </div>
+
+    <div *ngIf="currentVideo" class="video-container mb-3">
+      <!-- Event listener'ları ekleyin -->
+      <video #videoPlayer 
+             controls 
+             width="100%" 
+             class="rounded"
+             (click)="onVideoClick()"
+             (play)="onVideoPlay()">
+        <source [src]="videoSrc" type="video/mp4">
+        <!-- <source [src]="'http://localhost:8000/uploads/' + currentVideo.filename" type="video/mp4"> -->
+        Your browser does not support the video tag.
+      </video>
+      
+      <!-- Kullanıcı etkileşimi uyarısı -->
+      <div *ngIf="!userInteracted" class="alert alert-warning mt-2">
+        <small>
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <strong>Chrome requires:</strong> Click the video player once to enable quick navigation
+        </small>
+      </div>
+    </div>
+
+    <div *ngIf="currentVideo" class="mt-3">
+      <h6>Quick Navigation</h6>
+      <div class="btn-group flex-wrap" role="group">
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(0)">
+          00:00
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(30)">
+          00:30
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(60)">
+          01:00
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(120)">
+          02:00
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="goToMiddle()">
+          Middle
+        </button>
+      </div>
+      
+      <!-- Durum göstergesi -->
+      <div class="mt-2">
+        <small class="text-muted">
+          Status: 
+          <span *ngIf="userInteracted" class="text-success">
+            <i class="bi bi-check-circle"></i> Ready
+          </span>
+          <span *ngIf="!userInteracted" class="text-warning">
+            <i class="bi bi-exclamation-circle"></i> Click video to enable
+          </span>
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Debug panel (isteğe bağlı)
+<div class="card shadow mt-3">
+  <div class="card-header bg-secondary text-white">
+    <h6 class="mb-0">
+      <i class="bi bi-bug me-2"></i>Debug Console
+      <button class="btn btn-sm btn-outline-light float-end" (click)="clearDebugMessages()">
+        Clear
+      </button>
+    </h6>
+  </div>
+  <div class="card-body p-2" style="max-height: 200px; overflow-y: auto; font-size: 0.8rem;">
+    <div *ngFor="let msg of debugMessages" class="debug-message mb-1">
+      <code>{{msg}}</code>
+    </div>
+    <div *ngIf="debugMessages.length === 0" class="text-muted">
+      No debug messages yet...
+    </div>
+  </div>
+</div> -->
+
+
+
+
+<!-- <div class="card shadow">
+  <div class="card-header bg-info text-white">
+    <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Video Player</h5>
+  </div>
+  <div class="card-body text-center">
+    <div *ngIf="!currentVideo" class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>Please upload a video first to see the player
+    </div>
+
+    <div *ngIf="currentVideo" class="video-container mb-3">
+      <video #videoPlayer controls width="100%" class="rounded">
+        <source [src]="'http://localhost:8000/' + currentVideo.file_path" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <div *ngIf="currentVideo" class="mt-3">
+      <h6>Quick Navigation</h6>
+      <div class="btn-group flex-wrap" role="group">
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(0)">
+          00:00
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(30)">
+          00:30
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(60)">
+          01:00
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="setCurrentTime(120)">
+          02:00
+        </button>
+        <button class="btn btn-outline-primary btn-sm m-1" (click)="goToMiddle()">
+          Middle
+        </button>
+      </div>
+    </div>
+  </div>
+</div> -->

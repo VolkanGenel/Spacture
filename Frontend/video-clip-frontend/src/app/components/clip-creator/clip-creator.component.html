@@ -1,0 +1,249 @@
+<div class="clip-creator-container">
+  <!-- Left Panel -->
+  <div class="left-panel">
+    <!-- Video Player Section -->
+    <div class="video-section">
+      <h3 class="section-title">
+        <span class="section-icon">🎥</span>
+        Video Player
+      </h3>
+      <app-video-player></app-video-player>
+    </div>
+
+    <!-- Time Controls Section -->
+    <div class="controls-section">
+      <h3 class="section-title">
+        <span class="section-icon">✂️</span>
+        Clip Controls
+      </h3>
+      
+      <div class="time-controls">
+        <div class="time-input-group">
+          <div class="time-input">
+            <label for="startTime" class="input-label">
+              <span class="label-icon">⏱️</span>
+              Start Time
+            </label>
+            <div class="input-wrapper">
+              <input type="number" id="startTime" 
+                     [(ngModel)]="startTime" 
+                     min="0" 
+                     step="0.1"
+                     [max]="currentVideo?.duration"
+                     class="form-input">
+              <span class="input-suffix">seconds</span>
+            </div>
+          </div>
+          
+          <div class="time-input">
+            <label for="endTime" class="input-label">
+              <span class="label-icon">⏱️</span>
+              End Time
+            </label>
+            <div class="input-wrapper">
+              <input type="number" id="endTime" 
+                     [(ngModel)]="endTime" 
+                     min="0" 
+                     step="0.1"
+                     [max]="currentVideo?.duration"
+                     class="form-input">
+              <span class="input-suffix">seconds</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="preview-time">
+          <div class="duration-display">
+            <span class="duration-label">Clip Duration:</span>
+            <span class="duration-value">{{ getClipDuration().toFixed(2) }}s</span>
+          </div>
+          <div class="max-time">
+            Total: {{ currentVideo?.duration?.toFixed(2) || '0.00' }}s
+          </div>
+        </div>
+      </div>
+      
+      <div class="action-buttons">
+        <button class="btn btn-primary" 
+                (click)="createClip()" 
+                [disabled]="!isFormValid() || isProcessing">
+          <span class="btn-icon">✂️</span>
+          {{ isProcessing ? 'Creating...' : 'Create Clip' }}
+        </button>
+        
+        <button class="btn btn-secondary" 
+                (click)="resetForm()" 
+                [disabled]="!generatedClip">
+          <span class="btn-icon">🔄</span>
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Created Clip Section -->
+    <div class="clip-section" *ngIf="generatedClip">
+      <h3 class="section-title">
+        <span class="section-icon">✅</span>
+        Clip Created
+      </h3>
+      
+      <div class="clip-info-card">
+        <div class="clip-info">
+          <div class="clip-success">
+            <span class="success-icon">🎉</span>
+            <h4>Successfully Created!</h4>
+          </div>
+          <div class="clip-details">
+            <div class="detail-item">
+              <span class="detail-label">Duration:</span>
+              <span class="detail-value">{{ generatedClip.duration.toFixed(2) }}s</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Size:</span>
+              <span class="detail-value">Ready to save</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="clip-name-input">
+          <label class="input-label">
+            <span class="label-icon">📝</span>
+            Clip Name
+          </label>
+          <input type="text" 
+                 [(ngModel)]="clipName" 
+                 placeholder="Enter a descriptive name for your clip..."
+                 class="form-input"
+                 maxlength="100">
+          <div class="char-count">{{ clipName.length }}/100</div>
+        </div>
+        
+        <div class="clip-actions">
+          <button class="btn btn-success" 
+                  (click)="saveClip()" 
+                  [disabled]="!clipName.trim()">
+            <span class="btn-icon">💾</span>
+            Save Clip
+          </button>
+          
+          <button class="btn btn-download" 
+                  (click)="downloadClip()">
+            <span class="btn-icon">⬇️</span>
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div *ngIf="successMessage" class="message-card success-message">
+      <div class="message-icon">✅</div>
+      <div class="message-content">
+        <div class="message-title">Success!</div>
+        <div class="message-text">{{ successMessage }}</div>
+      </div>
+    </div>
+    
+    <div *ngIf="errorMessage" class="message-card error-message">
+      <div class="message-icon">⚠️</div>
+      <div class="message-content">
+        <div class="message-title">Error</div>
+        <div class="message-text">{{ errorMessage }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="right-panel">
+    <div class="saved-clips-container">
+      <div class="clips-header">
+        <h3 class="section-title">
+          <span class="section-icon">📚</span>
+          Saved Clips
+        </h3>
+        <div class="header-actions">
+          <button class="btn-refresh" 
+                  (click)="loadClips()" 
+                  [disabled]="isLoading">
+            <span class="refresh-icon" [class.spinning]="isLoading">🔄</span>
+            {{ isLoading ? 'Loading...' : 'Refresh' }}
+          </button>
+          <div class="clip-count">
+            {{ clips.length }} clip{{ clips.length !== 1 ? 's' : '' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Clips List -->
+      <div class="clips-list-container">
+        <div *ngIf="isLoading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading clips...</p>
+        </div>
+
+        <div *ngIf="!isLoading && clips.length === 0" class="empty-state">
+          <div class="empty-icon">📁</div>
+          <h4>No saved clips yet</h4>
+          <p>Create and save your first clip to see it here!</p>
+          <button class="btn btn-primary" (click)="scrollToCreate()">
+            <span class="btn-icon">✂️</span>
+            Create First Clip
+          </button>
+        </div>
+
+        <div *ngIf="!isLoading && clips.length > 0" class="clips-list">
+          <div *ngFor="let clip of clips" class="clip-card">
+            <div class="clip-card-header">
+              <div class="clip-title-section">
+                <h4 class="clip-title">{{ clip.name || 'Unnamed Clip' }}</h4>
+                <div class="clip-time-badge">
+                  {{ clip.start_time.toFixed(1) }}s - {{ clip.end_time.toFixed(1) }}s
+                </div>
+              </div>
+              <div class="clip-actions">
+                <button class="icon-btn" 
+                        [title]="'Download ' + (clip.name || 'clip')"
+                        (click)="downloadSavedClip(clip)">
+                  <span class="icon">⬇️</span>
+                </button>
+                <button class="icon-btn delete-btn" 
+                        title="Delete clip"
+                        (click)="deleteClip(clip.id)">
+                  <span class="icon">🗑️</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="clip-card-content">
+              <div class="clip-info-grid">
+                <div class="info-item">
+                  <span class="info-label">Source:</span>
+                  <span class="info-value">{{ clip.source_video }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Duration:</span>
+                  <span class="info-value">{{ (clip.end_time - clip.start_time).toFixed(1) }}s</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Created:</span>
+                  <span class="info-value">{{ formatDate(clip.created_at) }}</span>
+                </div>
+              </div>
+              
+              <div class="clip-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" 
+                       [style.width]="((clip.end_time - clip.start_time) / 60) * 100 + '%'">
+                  </div>
+                </div>
+                <div class="progress-label">
+                  {{ (clip.end_time - clip.start_time).toFixed(1) }}s of video
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

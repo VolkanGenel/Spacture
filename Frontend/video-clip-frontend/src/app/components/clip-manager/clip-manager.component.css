@@ -1,0 +1,26 @@
+/* Kartın toplam yüksekliğini sınırla */
+.card {
+  max-height: calc(100vh - 150px); /* Ekran yüksekliğinden biraz az (header/footer payı) */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sadece body kısmının kaydırılabilir olmasını sağla */
+.card-body {
+  overflow-y: auto;
+  overflow-x: hidden; /* Yatay taşmayı kesinlikle engelle */
+}
+
+/* Uzun isimlerin taşmasını önlemek için kritik kural */
+.min-width-0 {
+  min-width: 0;
+}
+
+/* Kaydırma çubuğunu güzelleştirelim */
+.card-body::-webkit-scrollbar {
+  width: 5px;
+}
+.card-body::-webkit-scrollbar-thumb {
+  background: #28a745;
+  border-radius: 10px;
+}

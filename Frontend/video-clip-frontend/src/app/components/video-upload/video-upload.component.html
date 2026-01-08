@@ -1,0 +1,90 @@
+<div class="video-upload-container">
+  <div class="upload-area" 
+       [class.dragover]="isDragover"
+       (dragover)="onDragOver($event)"
+       (dragleave)="onDragLeave($event)"
+       (drop)="onDrop($event)">
+    
+    <div class="upload-icon">📁</div>
+    
+    <h3 class="upload-title">
+      {{ selectedFile ? 'Ready to Upload' : 'Upload Video File' }}
+    </h3>
+    
+    <p class="upload-subtitle">
+      {{ selectedFile ? selectedFile.name : 'Click to upload or drag and drop' }}
+    </p>
+    
+    <p class="upload-info">
+      Supports MP4 • Max 100MB
+    </p>
+    
+    <div class="upload-actions">
+      <label class="btn-browse">
+        <input type="file" 
+               (change)="onFileSelected($event)"
+               accept=".mp4,.mp3"
+               style="display: none;">
+        <span class="btn-icon">📂</span>
+        Browse Files
+      </label>
+      
+      <button class="btn-upload" 
+              (click)="uploadVideo()" 
+              [disabled]="!selectedFile || isUploading">
+        <span class="btn-icon" *ngIf="!isUploading">⬆️</span>
+        <span class="spinner" *ngIf="isUploading"></span>
+        {{ isUploading ? 'Uploading...' : 'Upload Now' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Video Metadata -->
+  <div class="metadata-section" *ngIf="videoMetadata">
+    <h4 class="metadata-title">
+      <span class="metadata-icon">📊</span>
+      Video Information
+    </h4>
+    
+    <div class="metadata-grid">
+      <div class="metadata-item">
+        <span class="metadata-label">Duration:</span>
+        <span class="metadata-value">{{ formatDuration(videoMetadata.duration) }}</span>
+      </div>
+      
+      <div class="metadata-item">
+        <span class="metadata-label">Resolution:</span>
+        <span class="metadata-value">{{ videoMetadata.resolution }}</span>
+      </div>
+      
+      <div class="metadata-item">
+        <span class="metadata-label">FPS:</span>
+        <span class="metadata-value">{{ videoMetadata.fps }}</span>
+      </div>
+      
+      <div class="metadata-item">
+        <span class="metadata-label">Size:</span>
+        <span class="metadata-value">{{ formatFileSize(videoMetadata.file_size) }}</span>
+      </div>
+      
+      <div class="metadata-item">
+        <span class="metadata-label">Format:</span>
+        <span class="metadata-value">{{ getFileType(selectedFile) }}</span>
+      </div>
+      
+      <div class="metadata-item">
+        <span class="metadata-label">Frames:</span>
+        <span class="metadata-value">{{ videoMetadata.frame_count.toLocaleString() }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  <div *ngIf="errorMessage" class="error-message">
+    <div class="error-icon">⚠️</div>
+    <div class="error-content">
+      <div class="error-title">Upload Failed</div>
+      <div class="error-text">{{ errorMessage }}</div>
+    </div>
+  </div>
+</div>

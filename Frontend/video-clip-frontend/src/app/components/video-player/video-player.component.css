@@ -1,0 +1,10 @@
+.video-container {
+  max-height: 400px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000;
+}
+video {
+  max-height: 400px;
+  object-fit: contain;
+}

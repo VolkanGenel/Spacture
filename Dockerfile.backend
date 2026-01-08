@@ -1,0 +1,26 @@
+# Dockerfile.backend - FastAPI Backend için
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 1. FFmpeg yükle (video işleme için)
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Python bağımlılıklarını kopyala ve yükle
+COPY Backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 3. Uygulama kodunu kopyala
+COPY Backend/ /app/
+
+# 4. Klasörleri oluştur (uploads ve clips zaten var ama yine de)
+RUN mkdir -p uploads clips
+
+# 5. Port'u aç
+EXPOSE 8000
+
+# 6. Uygulamayı başlat
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
